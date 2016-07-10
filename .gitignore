@@ -1,7 +1,10 @@
 # Ignore configuration files that may contain sensitive information.
 sites/*/settings*.php
 sites/sites.php
+
 modules/o_contrib_seven
+sites/*/solr.php
+sites/*/drushrc.php
 
 # Ignore paths that contain user-generated content.
 sites/*/files
