@@ -73,7 +73,7 @@ abstract class SearchApiViewsHandlerFilterEntity extends SearchApiViewsHandlerFi
   public function option_definition() {
     $options = parent::option_definition();
 
-    $options['expose']['contains']['multiple']['default'] = TRUE;
+    $options['expose']['multiple']['default'] = TRUE;
 
     return $options;
   }

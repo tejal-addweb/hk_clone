@@ -4,15 +4,12 @@
       var checkboxes = '#modal-content input.entity-reference-view-widget-select';
       var selectAllSelector = '#entityreference-view-widget-select-all';
       $(selectAllSelector).unbind('click').data('unselect', 0).click(function() {
-        // Use the proper JQeury methd depending on the JQuery version.
-        var version = $.fn.jquery.split('.');
-        var use_prop = (version[0] > 1 || version[1] > 5);
         if ($(this).data('unselect')) {
-          use_prop ? $(checkboxes).prop('checked',false) : $(checkboxes).removeAttr('checked');
+          $(checkboxes).removeAttr('checked');
           $(this).data('unselect', 0).text(Drupal.t('Select all'));
         }
         else {
-          use_prop ? $(checkboxes).prop('checked',true) : $(checkboxes).$(checkboxes).attr('checked', 'checked');
+          $(checkboxes).attr('checked', 'checked');
           $(this).data('unselect', 1).text(Drupal.t('Unselect all'));
         }
         return false;
@@ -40,7 +37,7 @@
         }
       }
     }
-  };
+  }
 
   // Create a new ajax command, ervw_draggable that is called to make the rows
   // of the widget draggable.

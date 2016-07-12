@@ -44,12 +44,6 @@ function user_pass() {
     $form['name']['#value'] = $user->mail;
     $form['mail'] = array(
       '#prefix' => '<p>',
-      // As of https://www.drupal.org/node/889772 the user no longer must log
-      // out (if they are still logged in when using the password reset link,
-      // they will be logged out automatically then), but this text is kept as
-      // is to avoid breaking translations as well as to encourage the user to
-      // log out manually at a time of their own choosing (when it will not
-      // interrupt anything else they may have been in the middle of doing).
       '#markup' =>  t('Password reset instructions will be mailed to %email. You must log out to use the password reset link in the e-mail.', array('%email' => $user->mail)),
       '#suffix' => '</p>',
     );
@@ -60,11 +54,6 @@ function user_pass() {
   return $form;
 }
 
-/**
- * Form validation handler for user_pass().
- *
- * @see user_pass_submit()
- */
 function user_pass_validate($form, &$form_state) {
   $name = trim($form_state['values']['name']);
   // Try to load by email.
@@ -83,11 +72,6 @@ function user_pass_validate($form, &$form_state) {
   }
 }
 
-/**
- * Form submission handler for user_pass().
- *
- * @see user_pass_validate()
- */
 function user_pass_submit($form, &$form_state) {
   global $language;
 
@@ -112,20 +96,9 @@ function user_pass_reset($form, &$form_state, $uid, $timestamp, $hashed_pass, $a
   // When processing the one-time login link, we have to make sure that a user
   // isn't already logged in.
   if ($user->uid) {
-    // The existing user is already logged in. Log them out and reload the
-    // current page so the password reset process can continue.
+    // The existing user is already logged in.
     if ($user->uid == $uid) {
-      // Preserve the current destination (if any) and ensure the redirect goes
-      // back to the current page; any custom destination set in
-      // hook_user_logout() and intended for regular logouts would not be
-      // appropriate here.
-      $destination = array();
-      if (isset($_GET['destination'])) {
-        $destination = drupal_get_destination();
-      }
-      user_logout_current_user();
-      unset($_GET['destination']);
-      drupal_goto(current_path(), array('query' => drupal_get_query_parameters() + $destination));
+      drupal_set_message(t('You are logged in as %user. <a href="!user_edit">Change your password.</a>', array('%user' => $user->name, '!user_edit' => url("user/$user->uid/edit"))));
     }
     // A different user is already logged in on the computer.
     else {
@@ -137,8 +110,8 @@ function user_pass_reset($form, &$form_state, $uid, $timestamp, $hashed_pass, $a
         // Invalid one-time link specifies an unknown user.
         drupal_set_message(t('The one-time login link you clicked is invalid.'), 'error');
       }
-      drupal_goto();
     }
+    drupal_goto();
   }
   else {
     // Time out, in seconds, until login URL expires. Defaults to 24 hours =
@@ -166,6 +139,16 @@ function user_pass_reset($form, &$form_state, $uid, $timestamp, $hashed_pass, $a
           // Let the user's password be changed without the current password check.
           $token = drupal_random_key();
           $_SESSION['pass_reset_' . $user->uid] = $token;
+          //clear out flood event for user trying to log in too many times
+          if (variable_get('user_failed_login_identifier_uid_only', FALSE)) {
+            $identifier = $account->uid;
+          }
+          else {
+            $identifier = $account->uid . '-' . ip_address();
+          }
+          flood_clear_event('failed_login_attempt_user', $identifier);
+          //also clear out the ip attempts for that user
+          flood_clear_event('failed_login_attempt_ip');
           drupal_goto('user/' . $user->uid . '/edit', array('query' => array('pass-reset-token' => $token)));
         }
         else {
@@ -195,14 +178,6 @@ function user_pass_reset($form, &$form_state, $uid, $timestamp, $hashed_pass, $a
  * Menu callback; logs the current user out, and redirects to the home page.
  */
 function user_logout() {
-  user_logout_current_user();
-  drupal_goto();
-}
-
-/**
- * Logs the current user out.
- */
-function user_logout_current_user() {
   global $user;
 
   watchdog('user', 'Session closed for %name.', array('%name' => $user->name));
@@ -211,6 +186,8 @@ function user_logout_current_user() {
 
   // Destroy the current session, and reset $user to the anonymous user.
   session_destroy();
+
+  drupal_goto();
 }
 
 /**
@@ -327,18 +304,14 @@ function user_profile_form($form, &$form_state, $account, $category = 'account')
 }
 
 /**
- * Form validation handler for user_profile_form().
- *
- * @see user_profile_form_submit()
+ * Validation function for the user account and profile editing form.
  */
 function user_profile_form_validate($form, &$form_state) {
   entity_form_field_validate('user', $form, $form_state);
 }
 
 /**
- * Form submission handler for user_profile_form().
- *
- * @see user_profile_form_validate()
+ * Submit function for the user account and profile editing form.
  */
 function user_profile_form_submit($form, &$form_state) {
   $account = $form_state['user'];
@@ -365,6 +338,15 @@ function user_profile_form_submit($form, &$form_state) {
     // Remove the password reset tag since a new password was saved.
     unset($_SESSION['pass_reset_'. $account->uid]);
   }
+
+  // Clear the flood table. Since we don't know the IP address for this user
+  // we can't use flood_clear_event because we need to use the LIKE operator.
+  $identifier = $account->uid .'-%';
+  db_delete('flood')
+    ->condition('event', 'failed_login_attempt_user')
+    ->condition('identifier', $identifier, 'LIKE')
+    ->execute();
+
   // Clear the page cache because pages can contain usernames and/or profile information:
   cache_clear_all();
 
