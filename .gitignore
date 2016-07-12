@@ -5,9 +5,6 @@ sites/sites.php
 modules/o_contrib_seven
 sites/*/solr.php
 sites/*/drushrc.php
-sites/*/local.settings.php
-sites/herbert-kohlmeyer.de
-sites/hk-addweb-7431-prod.dot
 
 # Ignore paths that contain user-generated content.
 sites/*/files
